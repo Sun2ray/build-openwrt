@@ -18,8 +18,12 @@ sed -i 's/TARGET_rockchip/TARGET_rockchip\|\|TARGET_armvirt/g' package/lean/auto
 sed -i "s|DISTRIB_REVISION='.*'|DISTRIB_REVISION='R$(date +%Y.%m.%d)'|g" package/lean/default-settings/files/zzz-default-settings
 echo "DISTRIB_SOURCECODE='lede'" >>package/base-files/files/etc/openwrt_release
 
-# Modify default IP（FROM 192.168.1.1 CHANGE TO 192.168.31.4）
-# sed -i 's/192.168.1.1/192.168.31.4/g' package/base-files/files/bin/config_generate
+# 1. 修改默认IP为 192.168.123.1
+sed -i 's/192.168.1.1/192.168.123.1/g' package/base-files/files/bin/config_generate
+
+# 2. 设置初始密码为 password（密码经过加密，明文是 password）
+sed -i '/root::0:0:99999:7:::/d' package/base-files/files/etc/shadow
+echo 'root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::' >>package/base-files/files/etc/shadow
 
 # Replace the default software source
 # sed -i 's#openwrt.proxy.ustclug.org#mirrors.bfsu.edu.cn\\/openwrt#' package/lean/default-settings/files/zzz-default-settings
@@ -30,6 +34,18 @@ echo "DISTRIB_SOURCECODE='lede'" >>package/base-files/files/etc/openwrt_release
 #
 # Add luci-app-amlogic
 svn co https://github.com/ophub/luci-app-amlogic/trunk/luci-app-amlogic package/luci-app-amlogic
+
+# 3. 添加 passwall 插件源和插件
+# 添加 passwall 依赖源
+echo "src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main" >> feeds.conf.default
+echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main" >> feeds.conf.default
+# 编译 passwall 核心插件（按需选择，这里包含常用组件）
+sed -i '/DEFAULT_PACKAGES/ s/$/ luci-app-passwall luci-app-passwall2 v2ray-core xray-core sing-box clash/' target/linux/armvirt/Makefile
+
+# 4. 添加 openclash 插件
+git clone --depth=1 -b master https://github.com/vernesong/OpenClash.git package/luci-app-openclash
+# 编译 openclash 插件
+sed -i '/DEFAULT_PACKAGES/ s/$/ luci-app-openclash/' target/linux/armvirt/Makefile
 
 # Fix runc version error
 # rm -rf ./feeds/packages/utils/runc/Makefile
@@ -50,4 +66,3 @@ svn co https://github.com/ophub/luci-app-amlogic/trunk/luci-app-amlogic package/
 # git apply ../config/patches/{0001*,0002*}.patch --directory=feeds/luci
 #
 # ------------------------------- Other ends -------------------------------
-
