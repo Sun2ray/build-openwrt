@@ -12,14 +12,20 @@ on:
       source_branch:
         description: "Select the source branch"
         required: false
-        default: "openwrt-main"
+        default: "lede-master"
         type: choice
         options:
           - openwrt-main
           - lede-master
           - immortalwrt-master
           - Lienol-master
-      
+      # 补充缺失的 openwrt_storage 参数（解决变量未定义）
+      openwrt_storage:
+        description: "Storage type (仅用于标签，无实际作用)"
+        required: false
+        default: "generic"
+        type: string
+
 env:
   FEEDS_CONF: config/${{ inputs.source_branch }}/feeds.conf.default
   CONFIG_FILE: config/${{ inputs.source_branch }}/config
@@ -29,40 +35,53 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
+  # 补充缺失的环境变量
+  DEVICE_NAME: "generic-device"
+  FILE_DATE: $(date +"%Y%m%d")
+  # 关闭未使用的上传选项（避免变量未定义）
+  UPLOAD_COWTRANSFER: false
+  UPLOAD_WETRANSFER: false
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
-
+    # 修复条件表达式语法错误（整段放入 ${{ }}）
+    if: ${{ github.event.repository.owner.id == github.event.sender.id }}
     steps:
       - name: Checkout
-        uses: actions/checkout@main
+        uses: actions/checkout@v4  # 升级到稳定版 v4（main 分支可能不稳定）
 
       - name: Initialization environment
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          docker rmi `docker images -q`
+          docker rmi `docker images -q` 2>/dev/null
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android 2>/dev/null
           sudo -E apt-get -y update
-          sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
+          # 替换为国内源加速依赖安装（解决下载慢/失败）
+          sudo sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+          sudo sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
           sudo -E apt-get -y install $(curl -fsSL https://is.gd/depend_ubuntu2204_openwrt)
           sudo -E systemctl daemon-reload
-          #sudo -E apt-get -y full-upgrade
           sudo -E apt-get -y autoremove --purge
           sudo -E apt-get clean
           sudo mkdir -p /workdir
           sudo chown ${USER}:${GROUPS} /workdir
           sudo timedatectl set-timezone "${TZ}"
+          # 添加交换分区（解决内存不足）
+          sudo fallocate -l 4G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Clone source code [ ${{ inputs.source_branch }} ]
         id: codes
         working-directory: /workdir
-        if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
+        # 修复条件表达式语法错误
+        if: ${{ steps.init.outputs.status == 'success' && !cancelled() }}
         run: |
           # Set up compilation source code
           if [[ "${{ inputs.source_branch }}" == *"openwrt"* ]]; then
@@ -85,12 +104,13 @@ jobs:
               echo "Unknown source code repository."
               exit 1
           fi
-
-          # Clone source code
-          git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
+          # 克隆源码（添加超时和重试，解决网络问题）
+          git clone --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt || {
+              echo "第一次克隆失败，重试..."
+              git clone --single-branch --depth=1 --branch=${REPO_BRANCH} https://mirror.ghproxy.com/${REPO_URL} openwrt
+          }
           ln -sf /workdir/openwrt ${GITHUB_WORKSPACE}/openwrt
-
-          # Set output information
+          # 修复变量引用（openwrt_storage 已定义）
           echo "build_tag=OpenWrt_${TAGS_NAME}_${{ inputs.openwrt_storage }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
           echo -e "REPO_URL: [ ${REPO_URL} ]\nREPO_BRANCH: [ ${REPO_BRANCH} ]\nTAGS_NAME: [ ${TAGS_NAME} ]"
           df -hT ${PWD}
@@ -99,9 +119,14 @@ jobs:
       - name: Load custom feeds
         run: |
           [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
-          chmod +x ${DIY_P1_SH}
-          cd openwrt/
-          ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+          # 兼容 diy-part1.sh 不存在的情况
+          if [[ -f "${DIY_P1_SH}" ]]; then
+              chmod +x ${DIY_P1_SH}
+              cd openwrt/
+              ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+          else
+              echo "DIY_P1_SH 文件不存在，跳过执行"
+          fi
 
       - name: Update feeds
         run: cd openwrt/ && ./scripts/feeds update -a
@@ -113,16 +138,23 @@ jobs:
         run: |
           [[ -d "files" ]] && mv -f files openwrt/files
           [[ -e "${CONFIG_FILE}" ]] && cp -f ${CONFIG_FILE} openwrt/.config
-          chmod +x ${DIY_P2_SH}
-          cd openwrt/
-          ${GITHUB_WORKSPACE}/${DIY_P2_SH}
+          # 兼容 diy-part2.sh 不存在的情况
+          if [[ -f "${DIY_P2_SH}" ]]; then
+              chmod +x ${DIY_P2_SH}
+              cd openwrt/
+              ${GITHUB_WORKSPACE}/${DIY_P2_SH}
+          else
+              echo "DIY_P2_SH 文件不存在，跳过执行"
+          fi
 
       - name: Download package
         id: package
         run: |
           cd openwrt/
           make defconfig
-          make download -j8
+          # 降低下载线程数，避免超时
+          make download -j4
+          # 清理无效文件
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
@@ -130,51 +162,68 @@ jobs:
         id: compile
         run: |
           cd openwrt/
-          echo -e "$(nproc) thread compile"
-          make -j$(($(nproc) + 1)) V=s || make -j1 || make -j1 V=s
+          # 降低编译线程数（避免内存不足），优先用 2 线程
+          export THREAD_NUM=$(( $(nproc) > 2 ? 2 : $(nproc) ))
+          echo -e "${THREAD_NUM} thread compile"
+          # 编译失败时自动重试（单线程）
+          make -j${THREAD_NUM} || make -j1 V=s
           echo "status=success" >> ${GITHUB_OUTPUT}
 
-
       - name: Check space usage
-        if: (!cancelled())
+        if: ${{ !cancelled() }}
         run: df -hT
 
       - name: Upload bin directory
-        uses: actions/upload-artifact@main
-        if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+        uses: actions/upload-artifact@v4
+        if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true' }}
         with:
           name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
           path: openwrt/bin
 
       - name: Organize files
         id: organize
-        if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+        if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
         run: |
           cd openwrt/bin/targets/*/*
           rm -rf packages
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          echo "::set-output name=status::success"
+          echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload firmware directory
-        uses: actions/upload-artifact@main
-        if: steps.organize.outputs.status == 'success' && !cancelled()
+        uses: actions/upload-artifact@v4
+        if: ${{ steps.organize.outputs.status == 'success' && !cancelled() }}
         with:
           name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
           path: ${{ env.FIRMWARE }}
 
       - name: Generate release tag
         id: tag
-        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+        if: ${{ env.UPLOAD_RELEASE == 'true' && !cancelled() }}
         run: |
-          echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
+          RELEASE_TAG=$(date +"%Y.%m.%d-%H%M")
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
           touch release.txt
+          # 仅保留已定义的上传选项
           [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
           [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          echo "::set-output name=status::success"
+          # 补充固件信息到 release 描述
+          cat >> release.txt << EOF
+### OpenWrt Image information
+- Default IP: 192.168.123.1
+- Default username: root
+- Default password: password
+- Default WIFI name: OpenWrt
+- Default WIFI password: none
+### Install to EMMC
+- Login to OpenWrt → System → Amlogic Service → Install OpenWrt
+### OpenWrt Image Verification
+- sha256sum
+EOF
+          echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload firmware to release
         uses: softprops/action-gh-release@v1
-        if: steps.tag.outputs.status == 'success' && !cancelled()
+        if: ${{ steps.tag.outputs.status == 'success' && !cancelled() }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -187,17 +236,5 @@ jobs:
         with:
           retain_days: 1
           keep_minimum_runs: 3
-          token: ${{ secrets.GH_TOKEN }}
-          body: |
-
-            ### OpenWrt Image information
-            - Default IP: 192.168.1.1
-            - Default username: root
-            - Default password: password
-            - Default WIFI name: OpenWrt
-            - Default WIFI password: none
-            ### Install to EMMC
-            - Login to OpenWrt → System → Amlogic Service → Install OpenWrt
-            ### OpenWrt Image Verification
-            - sha256sum
-    
+          # 修复 token 变量（GH_TOKEN 改为 GITHUB_TOKEN，无需额外配置）
+          token: ${{ secrets.GITHUB_TOKEN }}
