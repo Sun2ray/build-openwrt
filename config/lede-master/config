@@ -1,14 +1,46 @@
-CONFIG_TARGET_qualcommax=y
-CONFIG_TARGET_qualcommax_ipq807x=y
-CONFIG_TARGET_qualcommax_ipq807x_DEVICE_xiaomi_redmi-router-ax6=y
-CONFIG_PACKAGE_luci=y
-CONFIG_LUCI_LANG_zh_Hans=y
-CONFIG_PACKAGE_luci-theme-argon=y  # 推荐的主题
-```[[1](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQGotKVvy4LsTLS1beuiMlYToKl5hiQ5yvWkYRVMeQbKGsQJd8D_SbWaAraRg_l8oTds1vyqQVlzReGNcwOk0LietssW-R6X2GVYSji9hHZi3wXa_ZNi__m7n7OxjL7MkKw1e9KYJs4l0Yk%3D)][[2](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQGEazPhGnQ5PS3hDvxFLiQm8Tbz86t5nLYtDK5hV7r6v5zwVY0aFlHjlBbPFgZPADmVX0KFmozd4FRXFHrb97koy53SgPhfBcEr1cuA-Wb4Cao7d3ETDnazvXLuySjzfdd7POav6MjHf-5KT9tyocfJ7baeCr-GDRVOWyQAzv-f3V8%3D)][[3](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQHFx94MWrtIugWW4EH0WzEaKXP8xtDp6jsuOzILEaM-2t7UOhrLHvapMILWZA6gq8SmcDnovy9kZHf8hFG7NSyhbTXgYF88uOjr4knR35D7VhgfZJKv9BQmyC8ju5Ejx1KMUHo6lyk4aWNicJGNJUHnSLQEkEogctMdtgnRh4oCkFFpJNsj)]
-CONFIG_PACKAGE_luci-app-turboacc=y  # 流量加速 (Shortcut-FE/BBR)
-```[[1](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQGotKVvy4LsTLS1beuiMlYToKl5hiQ5yvWkYRVMeQbKGsQJd8D_SbWaAraRg_l8oTds1vyqQVlzReGNcwOk0LietssW-R6X2GVYSji9hHZi3wXa_ZNi__m7n7OxjL7MkKw1e9KYJs4l0Yk%3D)][[2](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQGEazPhGnQ5PS3hDvxFLiQm8Tbz86t5nLYtDK5hV7r6v5zwVY0aFlHjlBbPFgZPADmVX0KFmozd4FRXFHrb97koy53SgPhfBcEr1cuA-Wb4Cao7d3ETDnazvXLuySjzfdd7POav6MjHf-5KT9tyocfJ7baeCr-GDRVOWyQAzv-f3V8%3D)][[3](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQHFx94MWrtIugWW4EH0WzEaKXP8xtDp6jsuOzILEaM-2t7UOhrLHvapMILWZA6gq8SmcDnovy9kZHf8hFG7NSyhbTXgYF88uOjr4knR35D7VhgfZJKv9BQmyC8ju5Ejx1KMUHo6lyk4aWNicJGNJUHnSLQEkEogctMdtgnRh4oCkFFpJNsj)]
-CONFIG_PACKAGE_luci-app-upnp=y       # UPnP自动端口转发
-CONFIG_PACKAGE_luci-app-wol=y        # 网络唤醒
-CONFIG_PACKAGE_luci-app-ddns=y       # 动态域名
-CONFIG_PACKAGE_luci-app-ttyd=y       # 网页终端
-```[[1](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQGotKVvy4LsTLS1beuiMlYToKl5hiQ5yvWkYRVMeQbKGsQJd8D_SbWaAraRg_l8oTds1vyqQVlzReGNcwOk0LietssW-R6X2GVYSji9hHZi3wXa_ZNi__m7n7OxjL7MkKw1e9KYJs4l0Yk%3D)][[2](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQGEazPhGnQ5PS3hDvxFLiQm8Tbz86t5nLYtDK5hV7r6v5zwVY0aFlHjlBbPFgZPADmVX0KFmozd4FRXFHrb97koy53SgPhfBcEr1cuA-Wb4Cao7d3ETDnazvXLuySjzfdd7POav6MjHf-5KT9tyocfJ7baeCr-GDRVOWyQAzv-f3V8%3D)][[3](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQHFx94MWrtIugWW4EH0WzEaKXP8xtDp6jsuOzILEaM-2t7UOhrLHvapMILWZA6gq8SmcDnovy9kZHf8hFG7NSyhbTXgYF88uOjr4knR35D7VhgfZJKv9BQmyC8ju5Ejx1KMUHo6lyk4aWNicJGNJUHnSLQEkEogctMdtgnRh4oCkFFpJNsj)]
+# 1. 目标平台与架构（核心，必须匹配）
+CONFIG_TARGET_ipq807x=y
+CONFIG_TARGET_ipq807x_generic=y
+CONFIG_TARGET_ipq807x_generic_DEVICE_xiaomi_ax6=y  # 红米AX6 设备专属配置（关键）
+
+# 2. 架构选型（IPQ8071A 为 ARM64）
+CONFIG_ARCH_64BIT=y
+CONFIG_TARGET_ARCH="aarch64"
+CONFIG_CPU_TYPE="cortex-a53"
+
+# 3. 固件格式（适配红米AX6 的 NAND 闪存）
+CONFIG_TARGET_IMAGES_FACTORY=y        # 原厂刷写格式（web/breed 刷写）
+CONFIG_TARGET_IMAGES_SYSUPGRADE=y     # 系统升级格式
+CONFIG_TARGET_ROOTFS_SQUASHFS=y       # 根文件系统格式（SquashFS 更稳定）
+CONFIG_TARGET_ROOTFS_JFFS2=n          # 红米AX6 不推荐 JFFS2
+CONFIG_TARGET_ROOTFS_PARTSIZE=100     # 根分区大小（根据需求调整，单位MB）
+
+# 4. 驱动与硬件适配（红米AX6 必需）
+CONFIG_PACKAGE_kmod-qca-nss-drv=y      # NSS 硬件加速（IPQ807x 核心驱动）
+CONFIG_PACKAGE_kmod-qca-ssdk=y        # 交换机驱动
+CONFIG_PACKAGE_kmod-wifi-qca807x=y    # WiFi6 驱动
+CONFIG_PACKAGE_wireless-regdb=y        # 无线区域规则
+CONFIG_PACKAGE_kmod-usb3=y            # USB3.0 驱动（红米AX6 有 USB 口）
+CONFIG_PACKAGE_kmod-nls-utf8=y        # 字符编码支持
+
+# 5. 基础系统组件
+CONFIG_PACKAGE_base-files=y
+CONFIG_PACKAGE_busybox=y
+CONFIG_PACKAGE_dropbear=y             # SSH 服务
+CONFIG_PACKAGE_firewall4=y            # 防火墙（nftables）
+CONFIG_PACKAGE_odhcp6c=y              # IPv6 DHCP 客户端
+CONFIG_PACKAGE_odhcpd-ipv6only=y      # IPv6 DHCP 服务端
+CONFIG_PACKAGE_opkg=y                 # 包管理工具
+
+# 6. 常用功能（可选，根据需求添加）
+CONFIG_PACKAGE_luci=y                 # Web 管理界面
+CONFIG_PACKAGE_luci-theme-argon=y     # 主题（可选）
+CONFIG_PACKAGE_luci-app-passwall=y    # 科学上网（可选）
+CONFIG_PACKAGE_luci-app-samba4=y      # Samba 共享（可选）
+CONFIG_PACKAGE_luci-app-ddns=y        # DDNS（可选）
+CONFIG_PACKAGE_luci-app-upnp=y        # UPnP（可选）
+
+# 7. 编译优化（可选）
+CONFIG_CFLAGS="-O2 -pipe -march=armv8-a-crc-crypto"
+CONFIG_CXXFLAGS="-O2 -pipe -march=armv8-a-crc-crypto"
+CONFIG_STRIP_STRIP_ALL=y              # 剥离调试信息，减小固件体积
