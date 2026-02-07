@@ -1,7 +1,3 @@
-#============================================================================================
-# https://github.com/ophub/amlogic-s9xxx-openwrt
-# Description: Build OpenWrt
-#============================================================================================
 name: 通用设备编译固件
 
 on:
@@ -19,7 +15,7 @@ on:
           - immortalwrt-master
           - Lienol-master
       openwrt_storage:
-        description: "Storage type (仅用于标签，无实际作用)"
+        description: "Storage type"
         required: false
         default: "generic"
         type: string
@@ -63,16 +59,14 @@ jobs:
           sudo mkdir -p /workdir
           sudo chown ${USER}:${GROUPS} /workdir
           sudo timedatectl set-timezone "${TZ}"
-          # 添加4G交换分区
           sudo fallocate -l 4G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
-          # 定义FILE_DATE（移到shell里执行，避免YAML语法错误）
           echo "FILE_DATE=$(date +"%Y%m%d")" >> $GITHUB_ENV
           echo "status=success" >> ${GITHUB_OUTPUT}
 
-      - name: Clone source code [ ${{ inputs.source_branch }} ]
+      - name: Clone source code
         id: codes
         working-directory: /workdir
         if: ${{ steps.init.outputs.status == 'success' && !cancelled() }}
@@ -97,27 +91,15 @@ jobs:
               echo "Unknown source code repository."
               exit 1
           fi
-          # 克隆源码（带代理重试）
-          git clone --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt || {
-              echo "第一次克隆失败，使用代理重试..."
-              git clone --single-branch --depth=1 --branch=${REPO_BRANCH} https://mirror.ghproxy.com/${REPO_URL} openwrt
-          }
+          git clone --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt || git clone --single-branch --depth=1 --branch=${REPO_BRANCH} https://mirror.ghproxy.com/${REPO_URL} openwrt
           ln -sf /workdir/openwrt ${GITHUB_WORKSPACE}/openwrt
           echo "build_tag=OpenWrt_${TAGS_NAME}_${{ inputs.openwrt_storage }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
-          echo -e "REPO_URL: [ ${REPO_URL} ]\nREPO_BRANCH: [ ${REPO_BRANCH} ]\nTAGS_NAME: [ ${TAGS_NAME} ]"
-          df -hT ${PWD}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Load custom feeds
         run: |
           [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
-          if [[ -f "${DIY_P1_SH}" ]]; then
-              chmod +x ${DIY_P1_SH}
-              cd openwrt/
-              ${GITHUB_WORKSPACE}/${DIY_P1_SH}
-          else
-              echo "DIY_P1_SH 文件不存在，跳过执行"
-          fi
+          [[ -f "${DIY_P1_SH}" ]] && chmod +x ${DIY_P1_SH} && cd openwrt/ && ${GITHUB_WORKSPACE}/${DIY_P1_SH}
 
       - name: Update feeds
         run: cd openwrt/ && ./scripts/feeds update -a
@@ -129,13 +111,7 @@ jobs:
         run: |
           [[ -d "files" ]] && mv -f files openwrt/files
           [[ -e "${CONFIG_FILE}" ]] && cp -f ${CONFIG_FILE} openwrt/.config
-          if [[ -f "${DIY_P2_SH}" ]]; then
-              chmod +x ${DIY_P2_SH}
-              cd openwrt/
-              ${GITHUB_WORKSPACE}/${DIY_P2_SH}
-          else
-              echo "DIY_P2_SH 文件不存在，跳过执行"
-          fi
+          [[ -f "${DIY_P2_SH}" ]] && chmod +x ${DIY_P2_SH} && cd openwrt/ && ${GITHUB_WORKSPACE}/${DIY_P2_SH}
 
       - name: Download package
         id: package
@@ -143,22 +119,14 @@ jobs:
           cd openwrt/
           make defconfig
           make download -j4
-          find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
       - name: Compile the OpenWrt
         id: compile
         run: |
           cd openwrt/
-          # 限制编译线程数为2（避免内存不足）
-          export THREAD_NUM=2
-          echo -e "${THREAD_NUM} thread compile"
-          make -j${THREAD_NUM} || make -j1 V=s
+          make -j2 || make -j1 V=s
           echo "status=success" >> ${GITHUB_OUTPUT}
-
-      - name: Check space usage
-        if: ${{ !cancelled() }}
-        run: df -hT
 
       - name: Upload bin directory
         uses: actions/upload-artifact@v4
@@ -189,20 +157,7 @@ jobs:
         run: |
           RELEASE_TAG=$(date +"%Y.%m.%d-%H%M")
           echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
-          touch release.txt
-          # 固件信息
-          cat >> release.txt << EOF
-### OpenWrt Image information
-- Default IP: 192.168.123.1
-- Default username: root
-- Default password: password
-- Default WIFI name: OpenWrt
-- Default WIFI password: none
-### Install to EMMC
-- Login to OpenWrt → System → Amlogic Service → Install OpenWrt
-### OpenWrt Image Verification
-- sha256sum
-EOF
+          echo -e "### OpenWrt Image information\n- Default IP: 192.168.123.1\n- Default username: root\n- Default password: password" > release.txt
           echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload firmware to release
