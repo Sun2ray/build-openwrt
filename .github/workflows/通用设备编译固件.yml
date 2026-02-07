@@ -2,7 +2,6 @@
 # https://github.com/ophub/amlogic-s9xxx-openwrt
 # Description: Build OpenWrt
 #============================================================================================
-
 name: 通用设备编译固件
 
 on:
@@ -19,7 +18,6 @@ on:
           - lede-master
           - immortalwrt-master
           - Lienol-master
-      # 补充缺失的 openwrt_storage 参数（解决变量未定义）
       openwrt_storage:
         description: "Storage type (仅用于标签，无实际作用)"
         required: false
@@ -35,21 +33,17 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
-  # 补充缺失的环境变量
   DEVICE_NAME: "generic-device"
-  FILE_DATE: $(date +"%Y%m%d")
-  # 关闭未使用的上传选项（避免变量未定义）
   UPLOAD_COWTRANSFER: false
   UPLOAD_WETRANSFER: false
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    # 修复条件表达式语法错误（整段放入 ${{ }}）
     if: ${{ github.event.repository.owner.id == github.event.sender.id }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4  # 升级到稳定版 v4（main 分支可能不稳定）
+        uses: actions/checkout@v4
 
       - name: Initialization environment
         id: init
@@ -59,10 +53,9 @@ jobs:
           docker rmi `docker images -q` 2>/dev/null
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android 2>/dev/null
-          sudo -E apt-get -y update
-          # 替换为国内源加速依赖安装（解决下载慢/失败）
           sudo sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
           sudo sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+          sudo -E apt-get -y update
           sudo -E apt-get -y install $(curl -fsSL https://is.gd/depend_ubuntu2204_openwrt)
           sudo -E systemctl daemon-reload
           sudo -E apt-get -y autoremove --purge
@@ -70,20 +63,20 @@ jobs:
           sudo mkdir -p /workdir
           sudo chown ${USER}:${GROUPS} /workdir
           sudo timedatectl set-timezone "${TZ}"
-          # 添加交换分区（解决内存不足）
+          # 添加4G交换分区
           sudo fallocate -l 4G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
+          # 定义FILE_DATE（移到shell里执行，避免YAML语法错误）
+          echo "FILE_DATE=$(date +"%Y%m%d")" >> $GITHUB_ENV
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Clone source code [ ${{ inputs.source_branch }} ]
         id: codes
         working-directory: /workdir
-        # 修复条件表达式语法错误
         if: ${{ steps.init.outputs.status == 'success' && !cancelled() }}
         run: |
-          # Set up compilation source code
           if [[ "${{ inputs.source_branch }}" == *"openwrt"* ]]; then
               REPO_URL="https://github.com/openwrt/openwrt"
               REPO_BRANCH="main"
@@ -104,13 +97,12 @@ jobs:
               echo "Unknown source code repository."
               exit 1
           fi
-          # 克隆源码（添加超时和重试，解决网络问题）
+          # 克隆源码（带代理重试）
           git clone --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt || {
-              echo "第一次克隆失败，重试..."
+              echo "第一次克隆失败，使用代理重试..."
               git clone --single-branch --depth=1 --branch=${REPO_BRANCH} https://mirror.ghproxy.com/${REPO_URL} openwrt
           }
           ln -sf /workdir/openwrt ${GITHUB_WORKSPACE}/openwrt
-          # 修复变量引用（openwrt_storage 已定义）
           echo "build_tag=OpenWrt_${TAGS_NAME}_${{ inputs.openwrt_storage }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
           echo -e "REPO_URL: [ ${REPO_URL} ]\nREPO_BRANCH: [ ${REPO_BRANCH} ]\nTAGS_NAME: [ ${TAGS_NAME} ]"
           df -hT ${PWD}
@@ -119,7 +111,6 @@ jobs:
       - name: Load custom feeds
         run: |
           [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
-          # 兼容 diy-part1.sh 不存在的情况
           if [[ -f "${DIY_P1_SH}" ]]; then
               chmod +x ${DIY_P1_SH}
               cd openwrt/
@@ -138,7 +129,6 @@ jobs:
         run: |
           [[ -d "files" ]] && mv -f files openwrt/files
           [[ -e "${CONFIG_FILE}" ]] && cp -f ${CONFIG_FILE} openwrt/.config
-          # 兼容 diy-part2.sh 不存在的情况
           if [[ -f "${DIY_P2_SH}" ]]; then
               chmod +x ${DIY_P2_SH}
               cd openwrt/
@@ -152,9 +142,7 @@ jobs:
         run: |
           cd openwrt/
           make defconfig
-          # 降低下载线程数，避免超时
           make download -j4
-          # 清理无效文件
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
@@ -162,10 +150,9 @@ jobs:
         id: compile
         run: |
           cd openwrt/
-          # 降低编译线程数（避免内存不足），优先用 2 线程
-          export THREAD_NUM=$(( $(nproc) > 2 ? 2 : $(nproc) ))
+          # 限制编译线程数为2（避免内存不足）
+          export THREAD_NUM=2
           echo -e "${THREAD_NUM} thread compile"
-          # 编译失败时自动重试（单线程）
           make -j${THREAD_NUM} || make -j1 V=s
           echo "status=success" >> ${GITHUB_OUTPUT}
 
@@ -203,10 +190,7 @@ jobs:
           RELEASE_TAG=$(date +"%Y.%m.%d-%H%M")
           echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
           touch release.txt
-          # 仅保留已定义的上传选项
-          [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
-          [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          # 补充固件信息到 release 描述
+          # 固件信息
           cat >> release.txt << EOF
 ### OpenWrt Image information
 - Default IP: 192.168.123.1
@@ -236,5 +220,4 @@ EOF
         with:
           retain_days: 1
           keep_minimum_runs: 3
-          # 修复 token 变量（GH_TOKEN 改为 GITHUB_TOKEN，无需额外配置）
           token: ${{ secrets.GITHUB_TOKEN }}
