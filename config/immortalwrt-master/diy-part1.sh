@@ -11,4 +11,6 @@
 
 # other
 # rm -rf package/emortal/{autosamba,ipv6-helper}
+# 添加 PassWall2 官方源
+echo 'src-git passwall https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main' >> feeds.conf.default
 
